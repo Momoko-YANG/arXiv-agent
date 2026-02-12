@@ -1,0 +1,30 @@
+# 敏感配置
+.env
+config.yaml
+
+# 数据库
+*.db
+
+# 运行产物
+*.json
+intelligent_report_*.md
+arxiv_report_*.txt
+arxiv_daily_*.json
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
