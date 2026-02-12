@@ -40,25 +40,36 @@ class OpenAIClient:
 
     def chat(self, prompt: str, system: str = None, model: str = None) -> str:
         """
-        发送 ChatCompletion 请求
+        发送 ChatCompletion 请求（带重试）
 
         Args:
             prompt: 用户消息
             system: 系统提示词（可选）
             model:  覆盖默认模型（可选）
         """
+        import time
+
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        response = self.client.chat.completions.create(
-            model=model or self.default_model,
-            messages=messages,
-            max_tokens=2000,
-            temperature=0.3,          # 学术总结偏低温
-        )
-        return response.choices[0].message.content
+        for attempt in range(3):
+            try:
+                response = self.client.chat.completions.create(
+                    model=model or self.default_model,
+                    messages=messages,
+                    max_tokens=2000,
+                    temperature=0.3,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                if attempt < 2:
+                    wait = 2 ** (attempt + 1)  # 2s, 4s
+                    print(f"    ⚠️  OpenAI 请求失败，{wait}s 后重试: {e}")
+                    time.sleep(wait)
+                else:
+                    raise
 
 
 # ---------------------------------------------------------------------------
@@ -115,11 +126,20 @@ class IntelligentArxivAgent:
         # 3. 生成中文摘要
         summaries = {}
         if auto_summarize and relevant_papers:
+            import time
             n = min(len(relevant_papers), 5)
             print(f"📝 正在为 {n} 篇论文生成中文摘要...")
             for i, paper in enumerate(relevant_papers[:5], 1):
                 print(f"  处理 {i}/{n}: {paper['title'][:50]}...")
-                summaries[paper['arxiv_id']] = self.summarize_paper(paper)
+                summary = self.summarize_paper(paper)
+                if not summary.startswith("摘要生成失败"):
+                    summaries[paper['arxiv_id']] = summary
+                else:
+                    print(f"    ❌ {summary}")
+                # 每次请求间隔 1 秒，避免触发速率限制
+                if i < n:
+                    time.sleep(1)
+            print(f"  ✅ 成功生成 {len(summaries)}/{n} 篇摘要")
             print()
 
         # 4. 保存到数据库
