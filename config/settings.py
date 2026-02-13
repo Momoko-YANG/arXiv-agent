@@ -44,7 +44,7 @@ class Settings:
     ])
 
     # ---- 抓取 ----
-    days: int = 1
+    days: int = 2          # 查最近 2 天（实际查询 +1 天缓冲 = 3 天覆盖周末）
     max_results: int = 200
     top_n: int = 5
     schedule_time: str = "09:00"
