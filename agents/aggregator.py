@@ -8,6 +8,7 @@ Paper Aggregator — 聚合所有数据源 + 评分 + 筛选 + 摘要
 
 from datetime import datetime
 from typing import List, Dict
+import re
 
 from agents.arxiv_agent import ArxivAgent
 from agents.semantic_agent import SemanticScholarClient
@@ -154,16 +155,25 @@ class PaperAggregator:
             response = self.llm.generate(prompt, system=FILTER_SYSTEM)
             print("  🧪 [DEBUG] GPT 原始 response:")
             print(response[:1500] + ("..." if len(response) > 1500 else ""))
+            id_pattern = re.compile(r"(\d{4}\.\d{4,5})(v\d+)?")
             relevant_ids = []
             for line in response.strip().split("\n"):
                 line = line.strip()
-                if len(line) >= 10 and "." in line:
-                    relevant_ids.append(line)
+                m = id_pattern.search(line)
+                if m:
+                    # 统一用无版本号形式，兼容 2602.12345 / 2602.12345v1
+                    relevant_ids.append(m.group(1))
 
             print(f"  🧪 [DEBUG] relevant_ids({len(relevant_ids)}): {relevant_ids}")
 
-            id_to_paper = {p["arxiv_id"]: p for p in papers}
-            sample_ids = list(id_to_paper.keys())[:10]
+            id_to_paper = {}
+            for p in papers:
+                pid = p["arxiv_id"].strip()
+                id_to_paper[pid] = p
+                base_id = re.sub(r"v\d+$", "", pid)
+                id_to_paper.setdefault(base_id, p)
+
+            sample_ids = [p["arxiv_id"] for p in papers[:10]]
             print(f"  🧪 [DEBUG] papers arxiv_id 样例({len(sample_ids)}): {sample_ids}")
             result = [id_to_paper[aid] for aid in relevant_ids if aid in id_to_paper]
             if result:
