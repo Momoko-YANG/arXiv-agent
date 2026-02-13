@@ -13,12 +13,12 @@ class OpenAIClient:
 
     def __init__(self, api_key: str = None, model: str = None,
                  base_url: str = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = self._sanitize_api_key(api_key or os.getenv("OPENAI_API_KEY", ""))
         if not self.api_key:
             raise ValueError("请设置 OPENAI_API_KEY 环境变量")
 
-        self.default_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
+        self.default_model = (model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")).strip()
+        self.base_url = self._sanitize_base_url(base_url or os.getenv("OPENAI_BASE_URL", ""))
         # 熔断窗口：连续失败后，短时间内快速失败，避免每次都等待 10s/20s
         self._disabled_until = 0.0
         self._last_error = ""
@@ -50,6 +50,25 @@ class OpenAIClient:
         except ImportError:
             raise ImportError("pip install openai httpx")
 
+    @staticmethod
+    def _sanitize_api_key(raw_key: str) -> str:
+        """
+        清洗 API key，避免 header 非法字符导致 requests 报错：
+        Invalid leading whitespace/reserved character in header value
+        """
+        key = (raw_key or "").strip()
+        if not key:
+            return ""
+        if any(ch in key for ch in ("\r", "\n", "\t")):
+            raise ValueError("OPENAI_API_KEY 包含非法换行/制表符，请在 Secrets 中重新粘贴")
+        return key
+
+    @staticmethod
+    def _sanitize_base_url(raw_url: str) -> str:
+        """清洗 BASE_URL，去前后空白和末尾斜杠"""
+        url = (raw_url or "").strip()
+        return url.rstrip("/") if url else ""
+
     @property
     def available(self) -> bool:
         """是否允许发起 LLM 请求（不做网络预检测）"""
@@ -64,7 +83,7 @@ class OpenAIClient:
         SDK 连接失败时的 HTTP 兜底：
         直接调用 /chat/completions，兼容 OpenAI 与大多数 OpenAI-compatible 网关。
         """
-        base = (self.base_url or "https://api.openai.com/v1").rstrip("/")
+        base = self.base_url or "https://api.openai.com/v1"
         url = f"{base}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
