@@ -28,11 +28,17 @@ class ArxivAgent:
         """
         抓取最近 N 天的论文
 
+        注意：arXiv 每天约 UTC 20:00 更新，周末不更新。
+              为避免时区 + 更新节奏导致漏抓，实际查询范围会额外 +1 天，
+              并覆盖完整的 0000~2359 时间段。
+
         Returns:
             论文字典列表
         """
-        date_from = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
-        date_to = datetime.now().strftime("%Y%m%d")
+        # +1 天缓冲，防止时区 / 周末 / arXiv 延迟导致空结果
+        actual_days = days + 1
+        date_from = (datetime.now() - timedelta(days=actual_days)).strftime("%Y%m%d") + "0000"
+        date_to = datetime.now().strftime("%Y%m%d") + "2359"
 
         if self.categories:
             cat_query = " OR ".join(f"cat:{c}" for c in self.categories)
