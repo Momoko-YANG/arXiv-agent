@@ -6,6 +6,7 @@ requests>=2.28.0         # HTTP（Telegram / S2 / Crossref API）
 
 # 智能 Agent
 openai>=1.0.0            # OpenAI API 客户端
+httpx>=0.25.0            # HTTP 客户端（OpenAI SDK 超时 + 重试配置）
 
 # 可选
 PyYAML>=6.0              # YAML 配置文件支持
