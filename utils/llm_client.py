@@ -8,7 +8,7 @@ import httpx
 
 
 class OpenAIClient:
-    """OpenAI ChatCompletion 客户端（带超时 + 重试 + 连通性检测）"""
+    """OpenAI ChatCompletion 客户端（带超时 + 重试 + 临时熔断）"""
 
     def __init__(self, api_key: str = None, model: str = None,
                  base_url: str = None):
@@ -18,7 +18,9 @@ class OpenAIClient:
 
         self.default_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
-        self._available = None  # None=未检测, True/False=已检测
+        # 熔断窗口：连续失败后，短时间内快速失败，避免每次都等待 10s/20s
+        self._disabled_until = 0.0
+        self._last_error = ""
 
         try:
             from openai import OpenAI
@@ -49,21 +51,12 @@ class OpenAIClient:
 
     @property
     def available(self) -> bool:
-        """检测 OpenAI API 是否可连通（首次调用时检测，缓存结果）"""
-        if self._available is None:
-            self._available = self._check_connectivity()
-        return self._available
+        """是否允许发起 LLM 请求（不做网络预检测）"""
+        return time.time() >= self._disabled_until
 
-    def _check_connectivity(self) -> bool:
-        """快速连通性检测（用最小请求试一次）"""
-        try:
-            self.client.models.list()
-            print("  ✅ OpenAI API 连通")
-            return True
-        except Exception as e:
-            print(f"  ⚠️  OpenAI API 不可达: {e}")
-            print(f"  ⚠️  将跳过所有 LLM 步骤，使用降级模式")
-            return False
+    def reset_circuit(self):
+        """重置熔断状态，允许再次尝试连接 LLM"""
+        self._disabled_until = 0.0
 
     def chat(self, prompt: str, system: str = None,
              model: str = None, temperature: float = 0.3,
@@ -81,6 +74,12 @@ class OpenAIClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        # 熔断窗口内快速失败，避免重复等待
+        if time.time() < self._disabled_until:
+            raise RuntimeError(
+                f"OpenAI 暂时不可用（熔断中）: {self._last_error or 'connection error'}"
+            )
+
         for attempt in range(3):
             try:
                 response = self.client.chat.completions.create(
@@ -89,8 +88,9 @@ class OpenAIClient:
                     max_tokens=max_tokens,
                     temperature=temperature,
                 )
-                # 成功后标记可用
-                self._available = True
+                # 成功后清空熔断状态
+                self._disabled_until = 0.0
+                self._last_error = ""
                 return response.choices[0].message.content
             except Exception as e:
                 if attempt < 2:
@@ -98,6 +98,8 @@ class OpenAIClient:
                     print(f"  ⚠️  OpenAI 请求失败，{wait}s 后重试: {e}")
                     time.sleep(wait)
                 else:
-                    # 标记不可用，后续调用可以提前跳过
-                    self._available = False
+                    # 连续失败后短暂熔断 120s，避免后续调用重复卡住
+                    self._last_error = str(e)
+                    self._disabled_until = time.time() + 120
+                    print("  ⚠️  OpenAI 连续失败，进入 120s 熔断窗口")
                     raise

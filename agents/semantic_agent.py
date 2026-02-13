@@ -4,6 +4,7 @@ Semantic Scholar Agent — 补充引用量、作者机构、发表状态
 """
 
 import time
+import re
 import requests
 from typing import List, Dict, Optional
 
@@ -19,6 +20,10 @@ class SemanticScholarClient:
         "title", "citationCount", "influentialCitationCount",
         "venue", "year", "authors", "authors.affiliations",
         "publicationTypes", "externalIds",
+    ])
+    BATCH_SAFE_FIELDS = ",".join([
+        "title", "citationCount", "influentialCitationCount",
+        "venue", "year", "authors", "publicationTypes", "externalIds",
     ])
 
     def __init__(self, api_key: str = None, delay: float = 1.0):
@@ -44,7 +49,8 @@ class SemanticScholarClient:
                     print(f"    ⏳ S2 限流，等待 {wait}s...")
                     time.sleep(wait)
                     continue
-                print(f"    ⚠️  S2 HTTP {resp.status_code}")
+                body = (resp.text or "").replace("\n", " ")[:240]
+                print(f"    ⚠️  S2 HTTP {resp.status_code}: {body}")
             except requests.RequestException as e:
                 if attempt < retries - 1:
                     wait = 2 ** (attempt + 1)
@@ -58,6 +64,15 @@ class SemanticScholarClient:
     # 批量 API — 一次请求查完（核心加速）
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _normalize_arxiv_id(arxiv_id: str) -> str:
+        """S2 兼容化：去 URL 前缀、去版本号 vN"""
+        aid = (arxiv_id or "").strip()
+        if "/abs/" in aid:
+            aid = aid.split("/abs/")[-1]
+        aid = re.sub(r"v\d+$", "", aid)
+        return aid
+
     def batch_get_papers(self, arxiv_ids: List[str]) -> Dict[str, dict]:
         """
         POST /paper/batch — 一次查完所有论文
@@ -68,7 +83,11 @@ class SemanticScholarClient:
             return {}
 
         url = f"{self.BASE_URL}/paper/batch"
-        ids = [f"ARXIV:{aid}" for aid in arxiv_ids]
+        pairs = [(aid, self._normalize_arxiv_id(aid)) for aid in arxiv_ids]
+        pairs = [(orig, norm) for orig, norm in pairs if norm]
+        ids = [f"ARXIV:{norm}" for _, norm in pairs]
+        if not ids:
+            return {}
 
         print(f"  📡 S2 批量查询 {len(ids)} 篇...")
         resp = self._request(
@@ -77,13 +96,22 @@ class SemanticScholarClient:
             params={"fields": self.PAPER_FIELDS},
         )
 
+        # 某些账号/区域对字段更严格，降级字段再试一次
+        if not resp:
+            print("    ⚠️  批量字段降级重试...")
+            resp = self._request(
+                "POST", url,
+                json={"ids": ids},
+                params={"fields": self.BATCH_SAFE_FIELDS},
+            )
+
         if not resp:
             print(f"    ⚠️  批量失败，回退逐篇查询")
             return self._fallback_sequential(arxiv_ids)
 
         data_list = resp.json()
         mapping = {}
-        for arxiv_id, data in zip(arxiv_ids, data_list):
+        for (arxiv_id, _), data in zip(pairs, data_list):
             if data:
                 mapping[arxiv_id] = data
 
@@ -94,7 +122,8 @@ class SemanticScholarClient:
         """批量失败时回退逐篇"""
         mapping = {}
         for aid in arxiv_ids:
-            url = f"{self.BASE_URL}/paper/ARXIV:{aid}"
+            normalized = self._normalize_arxiv_id(aid)
+            url = f"{self.BASE_URL}/paper/ARXIV:{normalized}"
             resp = self._request("GET", url, params={"fields": self.PAPER_FIELDS})
             if resp:
                 mapping[aid] = resp.json()

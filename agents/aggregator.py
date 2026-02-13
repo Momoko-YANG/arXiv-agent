@@ -72,17 +72,13 @@ class PaperAggregator:
             return {"papers": [], "relevant": [], "summaries": {}}
         print(f"  ✅ 共 {len(papers)} 篇\n")
 
-        # Step 2: 检测 OpenAI 可用性 + 筛选
+        # Step 2: 优先尝试 GPT 筛选（失败自动降级）
         print("🤖 Step 2/6: 论文筛选...")
-        llm_ok = self.llm.available
-        if llm_ok and s.research_interests:
+        if s.research_interests:
             print("  使用 GPT 智能筛选...")
             relevant = self._filter_relevant(papers, s.research_interests)
         else:
-            if not llm_ok:
-                print("  ⚠️  OpenAI 不可达，使用关键词预筛选")
-            else:
-                print("  未设置研究兴趣，使用关键词预筛选")
+            print("  未设置研究兴趣，使用关键词预筛选")
             relevant = self._keyword_prefilter(papers)
         print(f"  ✅ 筛选出 {len(relevant)} 篇\n")
 
@@ -112,11 +108,12 @@ class PaperAggregator:
         summaries = {}
         if top_papers:
             n = len(top_papers)
-            if llm_ok or self.llm.available:
-                print(f"🧠 Step 5/6: 三段式摘要（{n} 篇）")
-                summaries = self.summarizer.summarize_batch(top_papers, delay=0.5)
-            else:
-                print(f"🧠 Step 5/6: 规则摘要（LLM 不可用，{n} 篇）")
+            # 筛选阶段失败后，这里再给 LLM 一次机会（摘要优先）
+            self.llm.reset_circuit()
+            print(f"🧠 Step 5/6: 三段式摘要优先（{n} 篇）")
+            summaries = self.summarizer.summarize_batch(top_papers, delay=0.5)
+            if not summaries:
+                print(f"  ⚠️  LLM 摘要全部失败，降级规则摘要")
                 summaries = self._fallback_summaries(top_papers)
             print(f"  ✅ 生成 {len(summaries)}/{n} 篇摘要\n")
 

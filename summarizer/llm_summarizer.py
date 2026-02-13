@@ -131,8 +131,8 @@ class PaperSummarizer:
         if not abstract:
             return "• 无摘要信息"
 
-        # 如果已经连续失败 2+ 次，直接降级
-        if self._llm_failures >= 2:
+        # 连续失败较多时再全局降级，避免过早放弃 LLM
+        if self._llm_failures >= 6:
             return self._rule_based_summary(paper)
 
         key_text = extract_key_sentences(abstract)
@@ -164,8 +164,8 @@ class PaperSummarizer:
             arxiv_id = paper.get("arxiv_id", f"unknown_{i}")
             title_short = paper.get('title', '')[:50]
 
-            # 如果 LLM 已经不可用，全部走规则摘要
-            if self._llm_failures >= 2:
+            # 如果 LLM 连续失败很多次，后续走规则摘要
+            if self._llm_failures >= 6:
                 print(f"  📝 [{i}/{total}] 规则摘要(LLM 断连): {title_short}...")
                 results[arxiv_id] = self._rule_based_summary(paper)
                 continue
@@ -181,7 +181,7 @@ class PaperSummarizer:
             else:
                 print(f"       → {first_line[:60]}")
 
-            if i < total and delay > 0 and self._llm_failures < 2:
+            if i < total and delay > 0 and self._llm_failures < 6:
                 time.sleep(delay)
 
         return results
