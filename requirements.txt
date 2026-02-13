@@ -1,13 +1,15 @@
-# arXiv Agent 依赖包
+# arXiv Research Agent v2.0
 
 # 核心
 schedule>=1.1.0          # 定时任务调度
-requests>=2.28.0         # HTTP 请求（Telegram API）
+requests>=2.28.0         # HTTP（Telegram / S2 / Crossref API）
 
-# 智能 Agent（OpenAI GPT）
+# 智能 Agent
 openai>=1.0.0            # OpenAI API 客户端
 
 # 可选
 PyYAML>=6.0              # YAML 配置文件支持
-python-dateutil>=2.8.2   # 更好的日期处理
-feedparser>=6.0.10       # RSS 支持（备选抓取方式）
+python-dateutil>=2.8.2   # 日期处理
+
+# 测试
+pytest>=7.0.0            # 测试框架

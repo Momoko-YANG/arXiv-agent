@@ -1,0 +1,62 @@
+# arXiv Agent — 数据源配置
+# 每个数据源独立配置，方便后续扩展（PubMed, GitHub Papers...）
+
+# arXiv API
+arxiv:
+  base_url: "http://export.arxiv.org/api/query?"
+  categories:
+    - cs.AI      # Artificial Intelligence
+    - cs.LG      # Machine Learning
+    - cs.CV      # Computer Vision
+    - cs.CL      # Computation and Language (NLP)
+    - eess.AS    # Audio and Speech Processing
+    - stat.ML    # Machine Learning (Statistics)
+  days: 1
+  max_results: 200
+
+# Semantic Scholar API
+semantic_scholar:
+  base_url: "https://api.semanticscholar.org/graph/v1"
+  delay: 1.5           # 两次请求间隔（秒）
+  fields:
+    - title
+    - citationCount
+    - influentialCitationCount
+    - venue
+    - year
+    - authors
+    - authors.affiliations
+    - publicationTypes
+    - externalIds
+
+# Crossref API
+crossref:
+  base_url: "https://api.crossref.org/works"
+  delay: 1.0
+
+# Telegram 推送
+telegram:
+  top_n: 10
+  send_report_file: true
+
+# 研究兴趣（GPT 筛选用）
+research_interests: |
+  我关注以下 AI 研究方向：
+  1. 大语言模型（LLM）— 推理、对齐、安全
+  2. 多模态模型 — 视觉语言、文生图
+  3. 模型效率 — 量化、蒸馏、边缘部署
+  4. Agent 系统 — 工具使用、多智能体协作
+
+# 加分关键词
+bonus_keywords:
+  - LLM
+  - large language model
+  - reasoning
+  - chain-of-thought
+  - multimodal
+  - vision-language
+  - agent
+  - transformer
+  - diffusion
+  - quantization
+  - efficient

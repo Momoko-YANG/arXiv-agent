@@ -4,9 +4,14 @@ config.yaml
 
 # 数据库
 *.db
+data/processed/*.db
 
 # 运行产物
-*.json
+data/raw/*
+data/processed/*.md
+data/processed/*.json
+data/cache/*
+!data/**/.gitkeep
 intelligent_report_*.md
 arxiv_report_*.txt
 arxiv_daily_*.json
