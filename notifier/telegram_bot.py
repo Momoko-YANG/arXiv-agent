@@ -126,6 +126,24 @@ class TelegramNotifier:
 
             lines.append(f"{i}. {title}")
             lines.append(f"   {meta}")
+
+            # 作者信息（优先 S2，缺失则回退 arXiv）
+            s2_authors = paper.get("s2_authors", [])
+            valid_s2_names = [
+                (a.get("name") or "").strip()
+                for a in s2_authors
+                if (a.get("name") or "").strip()
+            ]
+            if valid_s2_names:
+                author_text = ", ".join(valid_s2_names[:3])
+                if len(valid_s2_names) > 3:
+                    author_text += "..."
+            else:
+                arxiv_authors = paper.get("authors", []) or []
+                author_text = ", ".join(arxiv_authors[:3]) if arxiv_authors else "未知作者"
+                if len(arxiv_authors) > 3:
+                    author_text += "..."
+            lines.append(f"   作者: {author_text}")
             lines.append(f"   {arxiv_url}")
 
             # 三段式摘要（bullet-point 逐行展示）

@@ -5,6 +5,7 @@ OpenAI ChatCompletion 客户端 — 统一 LLM 调用入口
 import os
 import time
 import httpx
+import requests
 
 
 class OpenAIClient:
@@ -58,6 +59,28 @@ class OpenAIClient:
         """重置熔断状态，允许再次尝试连接 LLM"""
         self._disabled_until = 0.0
 
+    def _chat_via_requests(self, messages, model, temperature, max_tokens) -> str:
+        """
+        SDK 连接失败时的 HTTP 兜底：
+        直接调用 /chat/completions，兼容 OpenAI 与大多数 OpenAI-compatible 网关。
+        """
+        base = (self.base_url or "https://api.openai.com/v1").rstrip("/")
+        url = f"{base}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": model or self.default_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=90)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"]
+
     def chat(self, prompt: str, system: str = None,
              model: str = None, temperature: float = 0.3,
              max_tokens: int = 2000) -> str:
@@ -98,8 +121,24 @@ class OpenAIClient:
                     print(f"  ⚠️  OpenAI 请求失败，{wait}s 后重试: {e}")
                     time.sleep(wait)
                 else:
-                    # 连续失败后短暂熔断 120s，避免后续调用重复卡住
-                    self._last_error = str(e)
-                    self._disabled_until = time.time() + 120
-                    print("  ⚠️  OpenAI 连续失败，进入 120s 熔断窗口")
-                    raise
+                    # SDK 路径失败后，尝试 requests 直连兜底一次
+                    try:
+                        print("  🔁 OpenAI SDK 失败，尝试 HTTP 直连兜底...")
+                        result = self._chat_via_requests(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                        )
+                        self._disabled_until = 0.0
+                        self._last_error = ""
+                        print("  ✅ HTTP 直连兜底成功")
+                        return result
+                    except Exception as fallback_error:
+                        # 连续失败后短暂熔断 120s，避免后续调用重复卡住
+                        self._last_error = str(fallback_error)
+                        self._disabled_until = time.time() + 120
+                        print("  ⚠️  OpenAI 连续失败，进入 120s 熔断窗口")
+                        if not self.base_url and not self.api_key.startswith("sk-"):
+                            print("  💡 当前 key 可能需要 OPENAI_BASE_URL（网关/代理）")
+                        raise fallback_error

@@ -235,13 +235,14 @@ class PaperAggregator:
             report.append(f"**arXiv ID**: {paper['arxiv_id']}")
 
             s2_authors = paper.get("s2_authors", [])
-            if s2_authors:
+            valid_s2_authors = [a for a in s2_authors if (a.get("name") or "").strip()]
+            if valid_s2_authors:
                 parts = []
-                for a in s2_authors[:5]:
+                for a in valid_s2_authors[:5]:
                     name = a.get("name", "")
                     affs = ", ".join(a.get("affiliations", []))
                     parts.append(f"{name} ({affs})" if affs else name)
-                if len(s2_authors) > 5:
+                if len(valid_s2_authors) > 5:
                     parts.append("...")
                 report.append(f"**作者**: {'; '.join(parts)}")
             else:
