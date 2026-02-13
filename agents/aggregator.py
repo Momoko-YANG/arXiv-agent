@@ -18,7 +18,7 @@ from scoring import (
 )
 from summarizer.llm_summarizer import PaperSummarizer, extract_key_sentences
 from summarizer.prompt_templates import FILTER_SYSTEM, FILTER_PROMPT
-from utils.llm_client import OpenAIClient
+from llm_client import LLMClient
 from utils.database import ArxivDatabase
 
 
@@ -33,8 +33,8 @@ class PaperAggregator:
         self.s2 = SemanticScholarClient(api_key=settings.s2_api_key)
         self.cr = CrossrefClient(mailto=settings.crossref_mailto)
 
-        # LLM
-        self.llm = OpenAIClient(
+        # LLM（纯 HTTP 直连，无 SDK 依赖）
+        self.llm = LLMClient(
             api_key=settings.openai_api_key,
             model=settings.openai_model,
         )
@@ -151,7 +151,7 @@ class PaperAggregator:
         )
 
         try:
-            response = self.llm.chat(prompt, system=FILTER_SYSTEM)
+            response = self.llm.generate(prompt, system=FILTER_SYSTEM)
             relevant_ids = []
             for line in response.strip().split("\n"):
                 line = line.strip()

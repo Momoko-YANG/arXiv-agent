@@ -91,7 +91,7 @@ class PaperSummarizer:
         """Stage 2: 结构化信息抽取"""
         prompt = EXTRACT_PROMPT.format(key_text=key_text, title=title)
         try:
-            result = self.llm.chat(prompt, system=EXTRACT_SYSTEM, temperature=0.2).strip()
+            result = self.llm.generate(prompt, system=EXTRACT_SYSTEM, temperature=0.2).strip()
             self._llm_failures = 0
             return result
         except Exception as e:
@@ -107,7 +107,7 @@ class PaperSummarizer:
             prompt = COMPRESS_PROMPT_EN.format(structured=structured_text, title=title)
             system = COMPRESS_SYSTEM_EN
         try:
-            result = self.llm.chat(prompt, system=system, temperature=0.6).strip()
+            result = self.llm.generate(prompt, system=system, temperature=0.6).strip()
             self._llm_failures = 0
             return result
         except Exception as e:
