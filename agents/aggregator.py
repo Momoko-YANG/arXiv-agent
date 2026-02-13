@@ -152,13 +152,19 @@ class PaperAggregator:
 
         try:
             response = self.llm.generate(prompt, system=FILTER_SYSTEM)
+            print("  🧪 [DEBUG] GPT 原始 response:")
+            print(response[:1500] + ("..." if len(response) > 1500 else ""))
             relevant_ids = []
             for line in response.strip().split("\n"):
                 line = line.strip()
                 if len(line) >= 10 and "." in line:
                     relevant_ids.append(line)
 
+            print(f"  🧪 [DEBUG] relevant_ids({len(relevant_ids)}): {relevant_ids}")
+
             id_to_paper = {p["arxiv_id"]: p for p in papers}
+            sample_ids = list(id_to_paper.keys())[:10]
+            print(f"  🧪 [DEBUG] papers arxiv_id 样例({len(sample_ids)}): {sample_ids}")
             result = [id_to_paper[aid] for aid in relevant_ids if aid in id_to_paper]
             if result:
                 return result[:top_k]
