@@ -153,8 +153,6 @@ class PaperAggregator:
 
         try:
             response = self.llm.generate(prompt, system=FILTER_SYSTEM)
-            print("  🧪 [DEBUG] GPT 原始 response:")
-            print(response[:1500] + ("..." if len(response) > 1500 else ""))
             id_pattern = re.compile(r"(\d{4}\.\d{4,5})(v\d+)?")
             relevant_ids = []
             for line in response.strip().split("\n"):
@@ -164,17 +162,12 @@ class PaperAggregator:
                     # 统一用无版本号形式，兼容 2602.12345 / 2602.12345v1
                     relevant_ids.append(m.group(1))
 
-            print(f"  🧪 [DEBUG] relevant_ids({len(relevant_ids)}): {relevant_ids}")
-
             id_to_paper = {}
             for p in papers:
                 pid = p["arxiv_id"].strip()
                 id_to_paper[pid] = p
                 base_id = re.sub(r"v\d+$", "", pid)
                 id_to_paper.setdefault(base_id, p)
-
-            sample_ids = [p["arxiv_id"] for p in papers[:10]]
-            print(f"  🧪 [DEBUG] papers arxiv_id 样例({len(sample_ids)}): {sample_ids}")
             result = [id_to_paper[aid] for aid in relevant_ids if aid in id_to_paper]
             if result:
                 return result[:top_k]
