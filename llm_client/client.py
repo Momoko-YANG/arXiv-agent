@@ -31,7 +31,7 @@ class LLMClient:
                  max_retries: int = 3):
         self.default_model = (
             model
-            or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            or os.getenv("OPENAI_MODEL", "gpt-5.2")
         ).strip()
 
         self.max_retries = max_retries
