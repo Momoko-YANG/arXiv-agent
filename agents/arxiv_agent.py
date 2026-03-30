@@ -4,7 +4,9 @@ arXiv Agent — 从 arXiv API 抓取最新论文
 
 import urllib.request
 import urllib.parse
+import urllib.error
 import xml.etree.ElementTree as ET
+import time
 from datetime import datetime, timedelta
 from typing import List, Dict
 
@@ -59,11 +61,34 @@ class ArxivAgent:
         print(f"  正在抓取 arXiv 论文...")
         print(f"  查询: {search_query[:80]}...")
 
-        try:
-            with urllib.request.urlopen(url) as resp:
-                data = resp.read()
-        except Exception as e:
-            print(f"  ❌ arXiv 请求失败: {e}")
+        max_retries = 3
+        data = None
+        for attempt in range(max_retries):
+            try:
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "arXiv-Agent/1.0 (https://github.com/arXiv-Agent; daily feed)"
+                })
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = resp.read()
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and attempt < max_retries - 1:
+                    wait = 5 * (attempt + 1)
+                    print(f"  ⏳ arXiv 429 限流，{wait}s 后重试 ({attempt + 1}/{max_retries})...")
+                    time.sleep(wait)
+                else:
+                    print(f"  ❌ arXiv 请求失败: {e}")
+                    return []
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = 3 * (attempt + 1)
+                    print(f"  ⚠️ 请求异常，{wait}s 后重试: {e}")
+                    time.sleep(wait)
+                else:
+                    print(f"  ❌ arXiv 请求失败: {e}")
+                    return []
+
+        if data is None:
             return []
 
         papers = self._parse_xml(data)
