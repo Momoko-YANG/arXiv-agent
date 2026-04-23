@@ -40,9 +40,14 @@ def parse_args():
         "--categories", nargs="+", default=None,
         help="arXiv 分类（如 cs.AI cs.LG cs.CV）",
     )
-    parser.add_argument(
-        "--react", action="store_true",
-        help="启用 ReAct Agent 模式（LLM 驱动决策循环）",
+    react_group = parser.add_mutually_exclusive_group()
+    react_group.add_argument(
+        "--react", dest="react", action="store_true", default=True,
+        help="显式启用 ReAct Agent 模式（默认）",
+    )
+    react_group.add_argument(
+        "--no-react", dest="react", action="store_false",
+        help="关闭 ReAct Agent 模式，使用固定流水线",
     )
     parser.add_argument(
         "--summarizer", choices=["oneshot", "threestage"],
@@ -65,8 +70,7 @@ def main():
         overrides["categories"] = args.categories
     if args.time is not None:
         overrides["schedule_time"] = args.time
-    if args.react:
-        overrides["react_mode"] = True
+    overrides["react_mode"] = args.react
     if args.summarizer is not None:
         overrides["summarizer_mode"] = args.summarizer
 

@@ -7,7 +7,7 @@
 ## 功能概览
 
 - 自动抓取最近论文，支持按分类和时间窗口运行
-- 两种筛选模式：固定流水线 / ReAct Agent
+- 两种筛选模式：默认 ReAct Agent / 可切换固定流水线
 - Semantic Scholar 补充引用数、作者机构、会议信息
 - Crossref 校验正式发表状态与 DOI
 - 五维评分：引用、机构、Venue、新鲜度、关键词
@@ -47,7 +47,7 @@ Telegram 推送         摘要 + 元数据 + 反馈按钮
 
 ### ReAct 模式
 
-启用 `--react` 后，LLM 不只负责“选哪些论文”，还会继续决定：
+默认启用 ReAct 时，LLM 不只负责“选哪些论文”，还会继续决定：
 
 - 最终推送哪些论文
 - 哪些论文值得调用 Crossref
@@ -151,7 +151,8 @@ CROSSREF_MAILTO=you@example.com
 说明：
 
 - `OPENAI_API_KEY` 为空时，项目仍可运行，但会回退到关键词预筛和规则摘要
-- `--react` 需要 OpenAI 才有意义；未配置时会自动回退
+- ReAct 默认启用；传入 `--no-react` 可切回固定流水线
+- ReAct 需要 OpenAI 才有意义；未配置时会自动回退
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` 为空时，Telegram 推送会被跳过
 
 ### 3. 运行
@@ -162,9 +163,9 @@ python main.py
 python main.py --once --days 3 --top 10
 python main.py --categories cs.AI cs.CL eess.AS
 python main.py --time 21:00
-python main.py --react
+python main.py --no-react
 python main.py --summarizer threestage
-python main.py --once --react --summarizer oneshot --top 8
+python main.py --once --no-react --summarizer oneshot --top 8
 ```
 
 ### 参数说明
@@ -176,7 +177,8 @@ python main.py --once --react --summarizer oneshot --top 8
 | `--top N` | 最终推送前 N 篇 | `5` |
 | `--time HH:MM` | 每日定时执行时间 | `09:00` |
 | `--categories X Y` | arXiv 分类列表 | `cs.AI cs.LG cs.CV cs.CL` |
-| `--react` | 启用 ReAct Agent 模式 | 关闭 |
+| `--react` | 显式启用 ReAct Agent 模式 | 开启 |
+| `--no-react` | 关闭 ReAct Agent 模式，切回固定流水线 | 关闭 |
 | `--summarizer MODE` | 摘要模式：`oneshot` / `threestage` | `oneshot` |
 
 ---
@@ -241,7 +243,7 @@ Stage 3  语义压缩      LLM 重写为 3 条要点        中温度
 
 ## ReAct 模式
 
-启用 `--react` 后，系统会用工具调用循环而不是只做一次静态筛选。当前 ReAct 路径会参与：
+默认情况下，系统会用工具调用循环而不是只做一次静态筛选；传入 `--no-react` 后会切回固定流水线。当前 ReAct 路径会参与：
 
 - 候选论文选择
 - 最终推送列表确定
