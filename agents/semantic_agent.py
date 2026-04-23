@@ -1,6 +1,8 @@
 """
 Semantic Scholar Agent — 补充引用量、作者机构、发表状态
 使用 batch API 一次查完所有论文（比逐篇快 10x）
+
+v3: 支持缓存层，避免重复查询
 """
 
 import time
@@ -9,6 +11,7 @@ import requests
 from typing import List, Dict, Optional
 
 from utils.rate_limit import RateLimiter
+from utils.cache import DiskCache
 
 
 class SemanticScholarClient:
@@ -26,11 +29,13 @@ class SemanticScholarClient:
         "venue", "year", "authors", "publicationTypes", "externalIds",
     ])
 
-    def __init__(self, api_key: str = None, delay: float = 1.0):
+    def __init__(self, api_key: str = None, delay: float = 1.0,
+                 cache: DiskCache = None):
         self.session = requests.Session()
         if api_key:
             self.session.headers["x-api-key"] = api_key
         self._limiter = RateLimiter(min_interval=delay)
+        self._cache = cache
 
     def _request(self, method: str, url: str, retries: int = 3,
                  **kwargs) -> Optional[requests.Response]:
@@ -134,12 +139,40 @@ class SemanticScholarClient:
     # ------------------------------------------------------------------
 
     def enrich_papers(self, papers: List[Dict]) -> List[Dict]:
-        """批量补充 S2 信息（使用 batch API）"""
+        """批量补充 S2 信息（使用 batch API + 缓存）"""
         arxiv_ids = [p["arxiv_id"] for p in papers if p.get("arxiv_id")]
-        s2_data = self.batch_get_papers(arxiv_ids)
+
+        # 先从缓存取
+        cached_data = {}
+        uncached_ids = []
+        if self._cache:
+            for aid in arxiv_ids:
+                cache_key = DiskCache.make_key("s2", aid)
+                hit = self._cache.get(cache_key)
+                if hit is not None:
+                    cached_data[aid] = hit
+                else:
+                    uncached_ids.append(aid)
+            if cached_data:
+                print(f"  💾 S2 缓存命中 {len(cached_data)} 篇")
+        else:
+            uncached_ids = arxiv_ids
+
+        # 对未缓存的调 API
+        s2_data = {}
+        if uncached_ids:
+            s2_data = self.batch_get_papers(uncached_ids)
+            # 写入缓存
+            if self._cache:
+                for aid, data in s2_data.items():
+                    cache_key = DiskCache.make_key("s2", aid)
+                    self._cache.set(cache_key, data)
+
+        # 合并缓存 + API 结果
+        all_data = {**cached_data, **s2_data}
 
         for paper in papers:
-            data = s2_data.get(paper.get("arxiv_id", ""))
+            data = all_data.get(paper.get("arxiv_id", ""))
             if data:
                 paper["s2_citation_count"] = data.get("citationCount", 0) or 0
                 paper["s2_influential_citation_count"] = (

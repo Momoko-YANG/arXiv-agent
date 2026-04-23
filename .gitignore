@@ -26,6 +26,8 @@ dist/
 build/
 .venv/
 venv/
+.pytest_cache
+tests/
 
 # IDE
 .vscode/

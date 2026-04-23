@@ -104,3 +104,49 @@ FILTER_PROMPT = """\
 格式示例：
 2402.12345
 2402.12346"""
+
+
+# ---------------------------------------------------------------------------
+# 单次调用合并摘要 prompt（v3 新增 — 省 50% LLM 调用）
+# ---------------------------------------------------------------------------
+
+ONESHOT_SYSTEM_ZH = (
+    "你是学术论文摘要专家。你必须用自己的语言概括，严禁照搬原文措辞。"
+)
+
+ONESHOT_PROMPT_ZH = """\
+阅读以下论文的标题和摘要，直接输出 3 条中文要点。
+
+规则（必须全部遵守）：
+1. 每条以 • 开头
+2. 每条不超过 25 个中文字
+3. 第一条：解决什么问题
+4. 第二条：用什么方法
+5. 第三条：达到什么效果
+6. 禁止直接翻译原句，必须用你自己的概括语言
+7. 使用中文学术术语
+
+论文标题：{title}
+
+摘要：{abstract}"""
+
+ONESHOT_SYSTEM_EN = (
+    "You are an academic paper summarization expert. "
+    "Rephrase everything in your own words — never copy original phrasing."
+)
+
+ONESHOT_PROMPT_EN = """\
+Read the title and abstract below, then output exactly 3 bullet points.
+
+Rules (must follow ALL):
+1. Each bullet starts with •
+2. Each bullet max 15 words
+3. Bullet 1: what problem is addressed
+4. Bullet 2: what method/approach is used
+5. Bullet 3: what outcome/result is achieved
+6. Do NOT reuse original phrases — rephrase everything
+7. Be specific, not generic
+
+Title: {title}
+
+Abstract: {abstract}"""

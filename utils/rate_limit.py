@@ -3,6 +3,7 @@
 """
 
 import time
+import threading
 
 
 class RateLimiter:
@@ -15,13 +16,15 @@ class RateLimiter:
         """
         self.min_interval = min_interval
         self._last_call = 0.0
+        self._lock = threading.Lock()
 
     def wait(self):
         """在调用前执行，自动等待到满足间隔"""
-        elapsed = time.time() - self._last_call
-        if elapsed < self.min_interval:
-            time.sleep(self.min_interval - elapsed)
-        self._last_call = time.time()
+        with self._lock:
+            elapsed = time.time() - self._last_call
+            if elapsed < self.min_interval:
+                time.sleep(self.min_interval - elapsed)
+            self._last_call = time.time()
 
     def __enter__(self):
         self.wait()

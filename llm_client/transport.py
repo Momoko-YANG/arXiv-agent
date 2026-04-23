@@ -6,6 +6,7 @@ HTTP 直连 Transport — 唯一网络通道
 """
 
 import os
+import threading
 import requests
 
 from .errors import (
@@ -32,12 +33,11 @@ class OpenAIHTTPTransport:
         self.base_url = raw_url.strip().rstrip("/") if raw_url.strip() else "https://api.openai.com/v1"
         self.timeout = timeout
 
-        # 持久 session，复用连接池
-        self._session = requests.Session()
-        self._session.headers.update({
+        self._headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-        })
+        }
+        self._session_local = threading.local()
 
     @staticmethod
     def _sanitize(raw: str) -> str:
@@ -49,6 +49,15 @@ class OpenAIHTTPTransport:
             )
         return key
 
+    def _get_session(self) -> requests.Session:
+        """为每个线程提供独立 Session，避免并发共享状态。"""
+        session = getattr(self._session_local, "session", None)
+        if session is None:
+            session = requests.Session()
+            session.headers.update(self._headers)
+            self._session_local.session = session
+        return session
+
     def call(self, messages: list, model: str = "gpt-4o-mini",
              temperature: float = 0.3, max_tokens: int = 2000) -> str:
         """
@@ -57,16 +66,42 @@ class OpenAIHTTPTransport:
         成功 → 返回 content 字符串
         失败 → 抛出对应的 LLM*Error（由上层决定是否重试）
         """
-        url = f"{self.base_url}/chat/completions"
         payload = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        data = self._do_request(payload)
+        return data["choices"][0]["message"]["content"]
+
+    def call_with_tools(self, messages: list, tools: list,
+                        model: str = "gpt-4o-mini",
+                        temperature: float = 0.3,
+                        max_tokens: int = 2000) -> dict:
+        """
+        发送带工具定义的 ChatCompletion 请求（function calling）
+
+        成功 → 返回完整 message dict（包含 content 或 tool_calls）
+        失败 → 抛出对应的 LLM*Error
+        """
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "tools": tools,
+        }
+        data = self._do_request(payload)
+        return data["choices"][0]["message"]
+
+    def _do_request(self, payload: dict) -> dict:
+        """统一请求逻辑"""
+        url = f"{self.base_url}/chat/completions"
+        session = self._get_session()
 
         try:
-            resp = self._session.post(url, json=payload, timeout=self.timeout)
+            resp = session.post(url, json=payload, timeout=self.timeout)
         except requests.ConnectionError as e:
             raise LLMConnectionError(f"连接失败: {e}") from e
         except requests.Timeout as e:
@@ -78,8 +113,7 @@ class OpenAIHTTPTransport:
         status = resp.status_code
 
         if status == 200:
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
+            return resp.json()
 
         # 提取 API 错误信息
         try:

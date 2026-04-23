@@ -11,6 +11,7 @@
 """
 
 import time
+import threading
 
 from .errors import (
     LLMAuthError,
@@ -38,32 +39,36 @@ class CircuitBreaker:
         self._failures = 0
         self._last_failure_time = 0.0
         self._state = "CLOSED"  # CLOSED / OPEN / HALF_OPEN
+        self._lock = threading.RLock()
 
     @property
     def state(self) -> str:
-        if self._state == "OPEN":
-            if time.time() - self._last_failure_time >= self.cooldown:
-                self._state = "HALF_OPEN"
-        return self._state
+        with self._lock:
+            if self._state == "OPEN":
+                if time.time() - self._last_failure_time >= self.cooldown:
+                    self._state = "HALF_OPEN"
+            return self._state
 
     def allow_request(self) -> bool:
-        s = self.state
-        return s in ("CLOSED", "HALF_OPEN")
+        return self.state in ("CLOSED", "HALF_OPEN")
 
     def record_success(self):
-        self._failures = 0
-        self._state = "CLOSED"
+        with self._lock:
+            self._failures = 0
+            self._state = "CLOSED"
 
     def record_failure(self):
-        self._failures += 1
-        self._last_failure_time = time.time()
-        if self._failures >= self.failure_threshold:
-            self._state = "OPEN"
+        with self._lock:
+            self._failures += 1
+            self._last_failure_time = time.time()
+            if self._failures >= self.failure_threshold:
+                self._state = "OPEN"
 
     def reset(self):
         """手动重置（用于跨阶段重试）"""
-        self._failures = 0
-        self._state = "CLOSED"
+        with self._lock:
+            self._failures = 0
+            self._state = "CLOSED"
 
 
 def call_with_retry(fn, retries: int = 3, circuit: CircuitBreaker = None):

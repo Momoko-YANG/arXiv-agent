@@ -40,6 +40,15 @@ def parse_args():
         "--categories", nargs="+", default=None,
         help="arXiv 分类（如 cs.AI cs.LG cs.CV）",
     )
+    parser.add_argument(
+        "--react", action="store_true",
+        help="启用 ReAct Agent 模式（LLM 驱动决策循环）",
+    )
+    parser.add_argument(
+        "--summarizer", choices=["oneshot", "threestage"],
+        default=None,
+        help="摘要模式: oneshot (快/省) 或 threestage (精细)",
+    )
     return parser.parse_args()
 
 
@@ -56,6 +65,10 @@ def main():
         overrides["categories"] = args.categories
     if args.time is not None:
         overrides["schedule_time"] = args.time
+    if args.react:
+        overrides["react_mode"] = True
+    if args.summarizer is not None:
+        overrides["summarizer_mode"] = args.summarizer
 
     # 默认研究兴趣（可在 config/sources.yaml 或 Settings 里修改）
     if "research_interests" not in overrides:
@@ -70,9 +83,11 @@ def main():
     # 加载配置
     settings = load_settings(**overrides)
 
-    print("🚀 arXiv Research Agent v2.0")
+    print("🚀 arXiv Research Agent v3.0")
     print(f"   分类: {', '.join(settings.categories)}")
     print(f"   Top N: {settings.top_n}")
+    print(f"   模式: {'ReAct Agent' if settings.react_mode else '流水线'}")
+    print(f"   摘要: {settings.summarizer_mode}")
     print(f"   OpenAI: {'✅' if settings.openai_api_key else '❌'}")
     print(f"   Telegram: {'✅' if settings.telegram_bot_token else '❌'}")
     print(f"   S2 API Key: {'✅' if settings.s2_api_key else '⚪ 免费模式'}")

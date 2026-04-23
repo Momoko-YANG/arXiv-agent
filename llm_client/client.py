@@ -105,6 +105,41 @@ class LLMClient:
         )
 
     # ------------------------------------------------------------------
+    # Function Calling（ReAct Agent 用）
+    # ------------------------------------------------------------------
+
+    def generate_with_tools(self, messages: list, tools: list,
+                            model: str = None,
+                            temperature: float = 0.3,
+                            max_tokens: int = 2000) -> dict:
+        """
+        发送带工具定义的请求（function calling）
+
+        Args:
+            messages: 完整对话消息列表
+            tools:    OpenAI tools schema 列表
+            model:    模型名
+            temperature: 温度
+            max_tokens:  最大 token 数
+
+        Returns:
+            message dict，包含 content 或 tool_calls
+        """
+        use_model = model or self.default_model
+
+        return call_with_retry(
+            fn=lambda: self._transport.call_with_tools(
+                messages=messages,
+                tools=tools,
+                model=use_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ),
+            retries=self.max_retries,
+            circuit=self._circuit,
+        )
+
+    # ------------------------------------------------------------------
     # 熔断控制
     # ------------------------------------------------------------------
 

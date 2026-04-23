@@ -73,6 +73,10 @@ class Settings:
     # ---- 数据库 ----
     db_path: str = "data/processed/arxiv_papers.db"
 
+    # ---- Agent 模式 ----
+    react_mode: bool = False    # True=ReAct 循环，False=固定流水线
+    summarizer_mode: str = "oneshot"  # "oneshot" / "threestage"
+
     def __post_init__(self):
         """从环境变量填充 API Keys"""
         self.openai_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY", "")
