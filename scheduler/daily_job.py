@@ -73,7 +73,9 @@ class DailyJob:
             report = self.aggregator.generate_report(result)
             report_file = f"data/processed/report_{datetime.now().strftime('%Y%m%d')}.md"
 
-            with open(report_file, "w", encoding="utf-8") as f:
+            # utf-8-sig 写入 BOM，确保 Telegram / 各类查看器正确识别为 UTF-8
+            # （无 BOM 的纯文本中文在部分 app 里会按 GBK 等旧编码解析成乱码）
+            with open(report_file, "w", encoding="utf-8-sig") as f:
                 f.write(report)
             print(f"✅ 报告已保存: {report_file}")
 

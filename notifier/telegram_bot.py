@@ -7,6 +7,7 @@ v3 新增:
   - 反馈存入数据库（供自适应评分使用）
 """
 
+import os
 import time
 import threading
 import requests
@@ -81,11 +82,14 @@ class TelegramNotifier:
 
     def send_document(self, file_path: str, caption: str = ""):
         """发送文件"""
+        filename = os.path.basename(file_path)
         with open(file_path, "rb") as f:
+            # 显式指定干净的文件名 + 带 charset 的 content-type，
+            # 帮助 Telegram / 客户端把 .md 正确按 UTF-8 渲染
             self._request(
                 "sendDocument",
                 data={"chat_id": self.chat_id, "caption": caption[:1024]},
-                files={"document": f},
+                files={"document": (filename, f, "text/markdown; charset=utf-8")},
             )
 
     def send_message_with_buttons(self, text: str, arxiv_id: str):
